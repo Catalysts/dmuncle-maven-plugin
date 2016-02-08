@@ -1,6 +1,8 @@
-DM-Uncle Maven Plugin
+# DM-Uncle Maven Plugin
+Analyses your project and reports dependency information to a configured server.
 
-Setup: add the code below to your pom.xml
+# Usage
+Add the code below to your pom.xml
 ```
 <plugin>
 	<groupId>io.dmuncle.maven</groupId>
@@ -28,6 +30,10 @@ Setup: add the code below to your pom.xml
 	</executions>
 </plugin>
 ```
-
-Run: first run the dmuncle-watch goal in the maven task panel (or in command line type: mvn dmuncle:dmuncle-watch)
-second run the dmuncle-send goal in the maven task panel (or in command line type: mvn dmuncle:dmuncle-send)
+From terminal run:
+```
+mvn dmuncle:dmuncle-watch
+```
+```
+mvn dmuncle:dmuncle-send
+```
