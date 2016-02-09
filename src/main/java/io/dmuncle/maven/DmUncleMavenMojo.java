@@ -79,7 +79,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
         }
     }
 
-    private void addDependencyToJSONPackage(Dependency dependencym, String moduleName) {
+    private void addDependencyToJSONPackage(Dependency dependency, String moduleName) {
         JSONObject jsonDep = new JSONObject();
         jsonDep.put("groupId", dependency.getGroupId());
         jsonDep.put("artifactId", dependency.getArtifactId());
