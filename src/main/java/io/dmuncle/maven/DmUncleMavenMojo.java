@@ -46,7 +46,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
         }
         for (int i = 0; i < project.getDependencies().size(); i++) {
             Dependency dependency = (Dependency) project.getDependencies().get(i);
-            addDependencyToJSONPackage(dependency);
+            addDependencyToJSONPackage(dependency, project.getName());
         }
         saveJSONPackage(JSONPackage);
     }
@@ -79,11 +79,12 @@ public class DmUncleMavenMojo extends AbstractMojo {
         }
     }
 
-    private void addDependencyToJSONPackage(Dependency dependency) {
+    private void addDependencyToJSONPackage(Dependency dependencym, String moduleName) {
         JSONObject jsonDep = new JSONObject();
         jsonDep.put("groupId", dependency.getGroupId());
         jsonDep.put("artifactId", dependency.getArtifactId());
         jsonDep.put("version", dependency.getVersion());
+        jsonDep.put("moduleName", moduleName);
         if (dependency.getScope().equals("compile")) {
             compileDeps.add(jsonDep);
         }
