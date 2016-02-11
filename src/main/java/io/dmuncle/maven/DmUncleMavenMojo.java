@@ -17,6 +17,7 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -135,7 +136,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
         System.out.flush();
         System.setOut(oldSystemOut);
         try {
-            List<String> consoleOutputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"));
+            List<String> consoleOutputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"), Charset.defaultCharset());
             for (String outputLine : consoleOutputLines) {
                 System.out.println(outputLine);
             }
@@ -149,7 +150,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
         List<String> outputLines = null;
         List<String> dependencies = new ArrayList<String>();
         try {
-            outputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"));
+            outputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"), Charset.defaultCharset());
         } catch (IOException e) {
 //            LOG.error("Error encountered on reading the buffer file: " + e.getMessage(), e);
         }
