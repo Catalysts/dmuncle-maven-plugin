@@ -65,6 +65,7 @@ public class DmUncleSendMojo extends AbstractMojo {
 
             con.disconnect();
             Files.delete(jsonFilePath);
+            Files.delete(Paths.get("dmuncle-buffer-file.txt"));
         } catch (MalformedURLException e) {
             LOG.error("Error encountered with server URL: " + e.getMessage(), e);
         } catch (ProtocolException e) {
