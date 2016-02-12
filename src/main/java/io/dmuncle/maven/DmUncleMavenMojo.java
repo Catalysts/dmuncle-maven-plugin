@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +32,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
     private static final Logger LOG = getLogger(DmUncleMavenMojo.class);
 
     public static final String JSON_PACKAGE_FILENAME = "dmuncle-package.json";
+    public static final String BUFFER_FILENAME = "dmuncle-buffer-file.txt";
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
@@ -42,19 +44,17 @@ public class DmUncleMavenMojo extends AbstractMojo {
     private JSONArray systemDeps;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
+        cleanUp();
         LOG.info("Gathering dependencies for project " + project.getName());
-        runCommandToListDependencies();
-        List<String> extractedOutputLines = processCommandLineOutput();
-        List<Dependency> projectDependencies = mapExtractedOutputLinesToDependencies(extractedOutputLines);
         File JSONFile = new File(JSON_PACKAGE_FILENAME);
         if (JSONFile.exists()) {
             getExistingJSONPackage();
         } else {
             initializeJSONPackage();
         }
-        for (Dependency dependency : projectDependencies) {
-            addDependencyToJSONPackage(dependency, project.getGroupId() + ":" + project.getArtifactId());
-        }
+        runCommandToListDependencies();
+        List<String> extractedOutputLines = processCommandLineOutput();
+        mapExtractedOutputLinesToDependencies(extractedOutputLines);
         saveJSONPackage(JSONPackage);
     }
 
@@ -154,9 +154,14 @@ public class DmUncleMavenMojo extends AbstractMojo {
         } catch (IOException e) {
 //            LOG.error("Error encountered on reading the buffer file: " + e.getMessage(), e);
         }
+        String module = null;
         boolean dependencyBlock = false;
         for (int i = 0; i < outputLines.size(); i++) {
             String line = outputLines.get(i);
+            if(line.contains("maven-dependency-plugin")) {
+                String partialModule = line.substring(line.indexOf("@"));
+                module = partialModule.replace("@", "").replace("---", "").trim();
+            }
             if (line.contains("The following files have been resolved:")) {
                 dependencyBlock = true;
             } else if (line.replace("[INFO]", "").equals(" ") && dependencyBlock) {
@@ -165,7 +170,8 @@ public class DmUncleMavenMojo extends AbstractMojo {
             if (dependencyBlock) {
                 String processedLine = line.replace("[INFO]", "").trim();
                 if (!processedLine.contains("The following files have been resolved:") && !processedLine.equals("none")) {
-                    dependencies.add(processedLine);
+                    System.out.println(module+":"+processedLine);
+                    dependencies.add(module+":"+processedLine);
                 }
             }
         }
@@ -177,14 +183,35 @@ public class DmUncleMavenMojo extends AbstractMojo {
         for (String line : lines) {
             String[] dependencyParts = line.split(":");
             Dependency dependency = new Dependency();
-            dependency.setGroupId(dependencyParts[0]);
-            dependency.setArtifactId(dependencyParts[1]);
-            dependency.setType(dependencyParts[2]);
-            dependency.setVersion(dependencyParts[3]);
-            dependency.setScope(dependencyParts[4]);
+            dependency.setGroupId(dependencyParts[1]);
+            dependency.setArtifactId(dependencyParts[2]);
+            dependency.setType(dependencyParts[3]);
+            dependency.setVersion(dependencyParts[4]);
+            dependency.setScope(dependencyParts[5]);
             dependencies.add(dependency);
+            addDependencyToJSONPackage(dependency, dependencyParts[0]);
         }
         return dependencies;
 
+    }
+
+    private void cleanUp() {
+        Path json = Paths.get(JSON_PACKAGE_FILENAME);
+        Path buffer = Paths.get(BUFFER_FILENAME);
+
+        if(Files.exists(json)) {
+            try {
+                Files.delete(json);
+            } catch (IOException e) {
+                LOG.error("Error encountered on deleting json file: " + e.getMessage(), e);
+            }
+        }
+        if(Files.exists(buffer)) {
+            try {
+                Files.delete(buffer);
+            } catch (IOException e) {
+                LOG.error("Error encountered on deleting buffer file: " + e.getMessage(), e);
+            }
+        }
     }
 }
