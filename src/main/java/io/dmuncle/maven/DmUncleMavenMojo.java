@@ -158,7 +158,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
         boolean dependencyBlock = false;
         for (int i = 0; i < outputLines.size(); i++) {
             String line = outputLines.get(i);
-            if(line.contains("maven-dependency-plugin")) {
+            if (line.contains("maven-dependency-plugin")) {
                 String partialModule = line.substring(line.indexOf("@"));
                 module = partialModule.replace("@", "").replace("---", "").trim();
             }
@@ -170,8 +170,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
             if (dependencyBlock) {
                 String processedLine = line.replace("[INFO]", "").trim();
                 if (!processedLine.contains("The following files have been resolved:") && !processedLine.equals("none")) {
-                    System.out.println(module+":"+processedLine);
-                    dependencies.add(module+":"+processedLine);
+                    dependencies.add(module + ":" + processedLine);
                 }
             }
         }
@@ -199,14 +198,14 @@ public class DmUncleMavenMojo extends AbstractMojo {
         Path json = Paths.get(JSON_PACKAGE_FILENAME);
         Path buffer = Paths.get(BUFFER_FILENAME);
 
-        if(Files.exists(json)) {
+        if (Files.exists(json)) {
             try {
                 Files.delete(json);
             } catch (IOException e) {
                 LOG.error("Error encountered on deleting json file: " + e.getMessage(), e);
             }
         }
-        if(Files.exists(buffer)) {
+        if (Files.exists(buffer)) {
             try {
                 Files.delete(buffer);
             } catch (IOException e) {
