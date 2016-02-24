@@ -15,25 +15,18 @@ Add the code below to your pom.xml
 	<executions>
 		<execution>
 			<id>gather</id>
-			<phase>package</phase>
+			<phase>install</phase>
 			<goals>
 				<goal>dmuncle-watch</goal>
 			</goals>
 		</execution>
 		<execution>
 			<id>send</id>
-			<phase>package</phase>
+			<phase>install</phase>
 			<goals>
 				<goal>dmuncle-send</goal>
 			</goals>
 		</execution>
 	</executions>
 </plugin>
-```
-From terminal run:
-```
-mvn dmuncle:dmuncle-watch
-```
-```
-mvn dmuncle:dmuncle-send
 ```
