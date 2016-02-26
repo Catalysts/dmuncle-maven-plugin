@@ -3,7 +3,7 @@ package io.dmuncle.maven;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
@@ -11,8 +11,8 @@ import org.codehaus.plexus.util.FileUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.slf4j.Logger;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,15 +24,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static org.slf4j.LoggerFactory.getLogger;
-
 /**
  * @author Cristian Ilca, Catalysts Romania on 07-Dec-15.
  */
-@Mojo(name = "dmuncle-send", defaultPhase = LifecyclePhase.PACKAGE, aggregator = true)
+@Mojo(name = "dmuncle-send", aggregator = true)
 public class DmUncleSendMojo extends AbstractMojo {
-    private static final Logger LOG = getLogger(DmUncleSendMojo.class);
+    protected Log LOG = getLog();
     public static final String JSON_PACKAGE_FILENAME = "dmuncle-package.json";
+    public static final String ERRORS_FILENAME = "dmuncle-errors-log.txt";
 
     @Parameter(required = true)
     private String serverAddress;
@@ -41,6 +40,10 @@ public class DmUncleSendMojo extends AbstractMojo {
     private MavenProject project;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
+        File errorLog = new File(ERRORS_FILENAME);
+        if (errorLog.exists()) {
+            LOG.error("There are errors that can affect the dependency report for this project! Please check the " + ERRORS_FILENAME + " file!");
+        }
         String url = serverAddress + "/import";
         LOG.info("Sending POST request to server " + url);
         Path jsonFilePath = Paths.get(JSON_PACKAGE_FILENAME);
@@ -56,9 +59,7 @@ public class DmUncleSendMojo extends AbstractMojo {
             os.flush();
 
             if (con.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                throw new RuntimeException("Failed : HTTP error code : "
-                        + con.getResponseCode());
-
+                throw new RuntimeException("Failed : HTTP error code : " + con.getResponseCode());
             } else {
                 LOG.info("Successfully sent data.");
             }

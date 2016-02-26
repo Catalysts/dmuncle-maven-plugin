@@ -7,6 +7,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.invoker.*;
 import org.codehaus.plexus.util.FileUtils;
@@ -19,7 +20,6 @@ import org.slf4j.Logger;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,12 +27,13 @@ import java.util.List;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-@Mojo(name = "dmuncle-watch", defaultPhase = LifecyclePhase.PACKAGE, aggregator = true)
+@Mojo(name = "dmuncle-watch", defaultPhase = LifecyclePhase.INSTALL)
 public class DmUncleMavenMojo extends AbstractMojo {
     private static final Logger LOG = getLogger(DmUncleMavenMojo.class);
 
     public static final String JSON_PACKAGE_FILENAME = "dmuncle-package.json";
     public static final String BUFFER_FILENAME = "dmuncle-buffer-file.txt";
+    public static final String ERRORS_FILENAME = "dmuncle-errors-log.txt";
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
@@ -44,8 +45,7 @@ public class DmUncleMavenMojo extends AbstractMojo {
     private JSONArray systemDeps;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
-        cleanUp();
-        LOG.info("Gathering dependencies for project " + project.getName());
+        LOG.info("Gathering dependencies for project: " + project.getName());
         File JSONFile = new File(JSON_PACKAGE_FILENAME);
         if (JSONFile.exists()) {
             getExistingJSONPackage();
@@ -115,52 +115,75 @@ public class DmUncleMavenMojo extends AbstractMojo {
     }
 
     void runCommandToListDependencies() {
-//        LOG.info("Executing: mvn dependency:list");
         PrintStream oldSystemOut = System.out;
         PrintStream out = null;
         try {
-            out = new PrintStream(new FileOutputStream("dmuncle-buffer-file.txt"));
+            out = new PrintStream(new FileOutputStream(BUFFER_FILENAME));
         } catch (FileNotFoundException e) {
-//            LOG.error("Error encountered on opening the buffer file: " + e.getMessage(), e);
+            LOG.error("Error encountered on opening the buffer file: " + e.getMessage(), e);
         }
         System.setOut(out);
         InvocationRequest request = new DefaultInvocationRequest();
-        request.setPomFile(new File("pom.xml"));
+        request.setPomFile(project.getFile());
         request.setGoals(Arrays.asList("dependency:list"));
+        InvocationOutputHandler outputHandler = new InvocationOutputHandler() {
+            public void consumeLine(String s) {
+                System.out.println(s);
+            }
+        };
+        request.setErrorHandler(outputHandler);
+        request.setOutputHandler(outputHandler);
         Invoker invoker = new DefaultInvoker();
         try {
             invoker.execute(request);
         } catch (MavenInvocationException e) {
-//            LOG.error("Error encountered on executing mvn dependency:list " + e.getMessage(), e);
+            LOG.error("Error encountered on executing mvn dependency:list " + e.getMessage(), e);
         }
         System.out.flush();
         System.setOut(oldSystemOut);
+        out.close();
         try {
-            List<String> consoleOutputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"), Charset.defaultCharset());
+            List<String> consoleOutputLines = Files.readAllLines(Paths.get(BUFFER_FILENAME), Charset.defaultCharset());
             for (String outputLine : consoleOutputLines) {
                 System.out.println(outputLine);
             }
         } catch (IOException e) {
-//            LOG.error("Error encountered on reading from the buffer file: " + e.getMessage(), e);
+            LOG.error("Error encountered on reading from the buffer file: " + e.getMessage(), e);
         }
     }
 
     private List<String> processCommandLineOutput() {
-//        LOG.info("Process command output");
         List<String> outputLines = null;
         List<String> dependencies = new ArrayList<String>();
         try {
-            outputLines = Files.readAllLines(Paths.get("dmuncle-buffer-file.txt"), Charset.defaultCharset());
+            outputLines = Files.readAllLines(Paths.get(BUFFER_FILENAME), Charset.defaultCharset());
         } catch (IOException e) {
-//            LOG.error("Error encountered on reading the buffer file: " + e.getMessage(), e);
+            LOG.error("Error encountered on reading the buffer file: " + e.getMessage(), e);
         }
         String module = null;
+        boolean buildFailed = false;
         boolean dependencyBlock = false;
         for (int i = 0; i < outputLines.size(); i++) {
             String line = outputLines.get(i);
-            if (line.contains("maven-dependency-plugin")) {
-                String partialModule = line.substring(line.indexOf("@"));
-                module = partialModule.replace("@", "").replace("---", "").trim();
+            if (line.contains("Building")) {
+                module = line.replace("[INFO]", "").replace("Building", "").trim();
+            }
+            if (line.contains("BUILD FAILURE")) {
+                buildFailed = true;
+                try {
+                    FileUtils.fileAppend(ERRORS_FILENAME, module + "\n");
+                } catch (IOException e) {
+                    LOG.error("Error encountered on writing in error log file: " + e.getMessage(), e);
+                }
+            }
+            if (buildFailed) {
+                if (line.contains("ERROR")) {
+                    try {
+                        FileUtils.fileAppend(ERRORS_FILENAME, line + "\n");
+                    } catch (IOException e) {
+                        LOG.error("Error encountered on writing in error log file: " + e.getMessage(), e);
+                    }
+                }
             }
             if (line.contains("The following files have been resolved:")) {
                 dependencyBlock = true;
@@ -173,6 +196,11 @@ public class DmUncleMavenMojo extends AbstractMojo {
                     dependencies.add(module + ":" + processedLine);
                 }
             }
+        }
+        try {
+            Files.delete(Paths.get(BUFFER_FILENAME));
+        } catch (IOException e) {
+            LOG.error("Error encountered on deleting the buffer file: " + e.getMessage(), e);
         }
         return dependencies;
     }
@@ -192,25 +220,5 @@ public class DmUncleMavenMojo extends AbstractMojo {
         }
         return dependencies;
 
-    }
-
-    private void cleanUp() {
-        Path json = Paths.get(JSON_PACKAGE_FILENAME);
-        Path buffer = Paths.get(BUFFER_FILENAME);
-
-        if (Files.exists(json)) {
-            try {
-                Files.delete(json);
-            } catch (IOException e) {
-                LOG.error("Error encountered on deleting json file: " + e.getMessage(), e);
-            }
-        }
-        if (Files.exists(buffer)) {
-            try {
-                Files.delete(buffer);
-            } catch (IOException e) {
-                LOG.error("Error encountered on deleting buffer file: " + e.getMessage(), e);
-            }
-        }
     }
 }
